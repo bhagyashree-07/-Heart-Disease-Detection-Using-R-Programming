@@ -1,0 +1,235 @@
+---
+title: "Diagnosis of Heart Disease"
+output: html_notebook
+---
+
+```{r}
+#install.packages("tidyverse")
+```
+```{r}
+library(tidyverse)
+```
+
+```{r}
+data <- read.csv("heart.csv")
+head(data)
+```
+
+```{r}
+tail(data)
+```
+
+```{r}
+glimpse(data)
+```
+
+```{r}
+ncol(data)
+```
+
+```{r}
+nrow(data)
+```
+
+```{r}
+colnames(data)
+```
+```{r}
+summary(data)
+```
+
+DATA TRANSFORMATION
+```{r}
+data2 <- data %>%
+  mutate(sex = if_else(sex == 1, "MALE", "FEMALE"),
+         fbs = if_else(fbs == 1, ">120", "<=120"),
+         exang = if_else(exang == 1, "YES" ,"NO"),
+         cp = if_else(cp == 1, "ATYPICAL ANGINA",
+                      if_else(cp == 2, "NON-ANGINAL PAIN", "ASYMPTOMATIC")),
+         restecg = if_else(restecg == 0, "NORMAL",
+                           if_else(restecg == 1, "ABNORMALITY", "PROBABLE OR DEFINITE")),
+         slope = as.factor(slope),
+         ca = as.factor(ca),
+         thal = as.factor(thal),
+         target = if_else(target == 1, "YES", "NO")
+         ) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  dplyr::select(target, sex, fbs, exang, cp, restecg, slope, ca, thal, everything())
+```
+
+```{r}
+#install.packages("repr")
+```
+Data Visualization
+```{r}
+library(repr)
+#change the size of the plot
+
+options(repr.plot.width =6, repr.plot.height =3)
+```
+
+```{r}
+# Bar Plot for target (heart disease)
+
+library(ggplot2)
+ggplot(data2, aes(x=data2$target, fill=data2$target))+
+   geom_bar()+
+   xlab("Heart Disease")+
+   ylab("count")+
+   ggtitle("Presence & Absence of Heart Disease")+
+   scale_fill_discrete(name= 'Heart Disease', labels =c("Absence", "Presence"))
+
+```
+
+```{r}
+prop.table(table(data2$target))
+```
+
+```{r}
+# count the frequency of the values of age
+library(magrittr) # needs to be run every time you start R and want to use %>%
+library(dplyr) 
+
+data2 %>%
+  group_by(ï..age) %>%
+  count() %>%
+  filter(n>10) %>%
+  ggplot()+
+  geom_col(aes(ï..age, n), fill = 'green')+
+  ggtitle("Age Analysis")+
+  xlab("Age")+
+  ylab("Agecount")
+```
+
+```{r}
+# comapre blood pressure across the chest pain
+
+data2 %>%
+  ggplot(aes(x=sex, y=trestbps))+
+  geom_boxplot(fill ='purple')+
+  xlab('sex')+
+  ylab('BP')+
+  facet_grid(~cp)
+```
+```{r}
+data %>%
+  ggplot(aes(x=sex, y=trestbps))+
+  geom_boxplot(fill ='purple')+
+  xlab('sex')+
+  ylab('BP')+
+  facet_grid(~cp)
+```
+```{r}
+data2 %>%
+  ggplot(aes(x=sex, y=chol))+
+  geom_boxplot(fill ='orange')+
+  xlab('sex')+
+  ylab('Chol')+
+  facet_grid(~cp)
+```
+
+```{r}
+#install.packages("corrplot")
+#install.packages("ggplot2")
+```
+
+```{r}
+library(corrplot)
+library(ggplot2)
+```
+```{r}
+cor_heart <- cor(data2[, 10:14])
+cor_heart
+
+corrplot(cor_heart, method ='square', type='upper')
+```
+```{r}
+??method
+```
+
+Check for Null Values
+```{r}
+s = sum(is.na(data2))
+```
+```{r}
+s
+```
+
+```{r}
+is.null(data2) #another way
+```
+```{r}
+#install.packages("caret")
+```
+
+```{r}
+library(caret)
+set.seed(10)
+```
+
+```{r}
+colnames(data2)
+```
+
+```{r}
+inTrainRows <- createDataPartition(data2$target,p=0.7,list=FALSE)
+trainData <- data2[inTrainRows,]
+testData <-  data2[-inTrainRows,]
+nrow(trainData)/(nrow(testData)+nrow(trainData)) #check the percentage
+```
+
+```{r}
+AUC = list()
+Accuracy = list()
+```
+
+
+```{r}
+set.seed(10)
+logRegModel <- train(target ~ ., data=trainData, method = 'glm', family = 'binomial')
+logRegPrediction <- predict(logRegModel, testData)
+logRegPredictionprob <- predict(logRegModel, testData, type='prob')[2]
+logRegConfMat <- confusionMatrix(logRegPrediction, testData[,"target"])
+#ROC Curve
+library(pROC)
+AUC$logReg <- roc(as.numeric(testData$target),as.numeric(as.matrix((logRegPredictionprob))))$auc
+Accuracy$logReg <- logRegConfMat$overall['Accuracy']  #found names with str(logRegConfMat)
+```
+
+
+```{r}
+library(pROC)
+```
+
+
+```{r}
+set.seed(10)
+logRegModel <- train(target ~ ., data=trainData, method = 'glm', family = 'binomial')
+logRegPrediction <- predict(logRegModel, testData)
+logRegPredictionprob <- predict(logRegModel, testData, type='prob')[2]
+logRegConfMat <- confusionMatrix(logRegPrediction, testData[,"target"])
+#ROC Curve
+library(pROC)
+AUC$logReg <- roc(as.numeric(testData$target),as.numeric(as.matrix((logRegPredictionprob))))$auc
+Accuracy$logReg <- logRegConfMat$overall['Accuracy']  #found names with str(logRegConfMat)
+```
+
+
+
+```{r}
+Accuracy
+
+                      
+```
+```{r}
+AUC
+```
+
+```{r}
+summary(logRegModel)$coeff
+```
+
+```{r}
+logRegConfMat
+```
+
